@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+
+{% block title %}SQL-консоль{% endblock %}
+{% block page_title %}SQL-консоль{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{{ url_for('db_manager') }}" class="text-decoration-none text-muted">
+      Менеджер БД
+    </a>
+  </li>
+  <li class="breadcrumb-item active">SQL-консоль</li>
+{% endblock %}
+
+{% block content %}
+
+<div class="row g-4">
+
+  <!-- ── LEFT: Editor ── -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span>
+          <i class="bi bi-terminal me-2 text-success"></i>
+          SQL-редактор
+        </span>
+        <span class="badge text-bg-warning" style="font-size:11px;">
+          <i class="bi bi-shield-check me-1"></i>Только SELECT / PRAGMA
+        </span>
+      </div>
+      <div class="card-body">
+        <form method="POST" id="sqlForm">
+
+          <div class="position-relative mb-3">
+            <textarea name="sql" id="sqlInput"
+                      class="form-control"
+                      rows="7"
+                      style="font-family:monospace; font-size:13.5px;
+                             background:#1e293b; color:#e2e8f0;
+                             border-color:#334155; resize:vertical;"
+                      placeholder="SELECT * FROM telemetry LIMIT 20;"
+                      spellcheck="false">{{ query_text }}</textarea>
+          </div>
+
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-play-fill me-2"></i>Выполнить запрос
+            </button>
+            <button type="button" class="btn btn-outline-secondary"
+                    onclick="document.getElementById('sqlInput').value=''">
+              <i class="bi bi-trash me-1"></i>Очистить
+            </button>
+            <a href="{{ url_for('db_manager') }}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left me-1"></i>К менеджеру БД
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── RESULT ── -->
+    {% if error %}
+    <div class="alert alert-danger mt-3">
+      <i class="bi bi-exclamation-triangle me-2"></i>{{ error }}
+    </div>
+    {% endif %}
+
+    {% if result_cols %}
+    <div class="card mt-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span>
+          <i class="bi bi-table me-2 text-success"></i>
+          Результат
+          <span class="badge text-bg-success ms-1">{{ row_count }} строк</span>
+        </span>
+        {% if exec_time is not none %}
+        <span style="font-size:11px; color:#94a3b8;">
+          <i class="bi bi-clock me-1"></i>{{ exec_time }} мс
+        </span>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height:400px; overflow:auto;">
+          <table class="table table-hover table-sm mb-0"
+                 style="font-size:12.5px; font-family:monospace;">
+            <thead style="position:sticky; top:0; z-index:1;">
+              <tr>
+                {% for col in result_cols %}
+                <th class="ps-3" style="white-space:nowrap;">
+                  <span style="color:#3b82f6;">{{ col }}</span>
+                </th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in result_rows %}
+              <tr>
+                {% for cell in row %}
+                <td class="ps-3" style="white-space:nowrap; max-width:250px; overflow:hidden; text-overflow:ellipsis;">
+                  {% if cell is none %}
+                    <span class="text-muted">NULL</span>
+                  {% else %}
+                    {{ cell }}
+                  {% endif %}
+                </td>
+                {% endfor %}
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="{{ result_cols|length }}"
+                    class="text-center py-3 text-muted">
+                  Запрос вернул 0 строк
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% elif query_text and not error %}
+    <div class="alert alert-info mt-3">
+      <i class="bi bi-info-circle me-2"></i>Запрос выполнен, результат пуст (0 строк).
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── RIGHT: Hints ── -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-lightbulb me-2 text-warning"></i>Готовые запросы
+      </div>
+      <div class="card-body p-2">
+        {% for hint in hints %}
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm w-100 text-start mb-1"
+                style="font-family:monospace; font-size:11.5px; white-space:normal;"
+                onclick="setQuery(this.dataset.query)"
+                data-query="{{ hint }}">
+          {{ hint }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Schema -->
+    <div class="card mt-3">
+      <div class="card-header" style="font-size:12px;">
+        <i class="bi bi-diagram-3 me-1"></i>Схема БД
+      </div>
+      <div class="card-body p-0">
+        <div style="background:#1e293b; border-radius:0 0 14px 14px;
+                    padding:14px; font-family:monospace; font-size:11.5px;
+                    color:#94a3b8; line-height:1.8;">
+
+          <div style="color:#60a5fa; margin-bottom:6px;">TABLE sensor</div>
+          <div class="ms-2">
+            <span style="color:#f59e0b;">sensor_id</span> INTEGER PK<br>
+            <span style="color:#e2e8f0;">name</span> VARCHAR(100) NOT NULL<br>
+            <span style="color:#e2e8f0;">unit</span> VARCHAR(50)<br>
+            <span style="color:#e2e8f0;">description</span> TEXT
+          </div>
+
+          <div style="color:#60a5fa; margin:10px 0 6px;">TABLE telemetry</div>
+          <div class="ms-2">
+            <span style="color:#f59e0b;">id</span> INTEGER PK AUTOINCREMENT<br>
+            <span style="color:#e2e8f0;">timestamp</span> DATETIME NOT NULL<br>
+            <span style="color:#10b981;">sensor_id</span> INTEGER FK→sensor<br>
+            <span style="color:#e2e8f0;">value</span> REAL NOT NULL
+          </div>
+
+          <div style="color:#60a5fa; margin:10px 0 6px;">TABLE prediction</div>
+          <div class="ms-2">
+            <span style="color:#f59e0b;">id</span> INTEGER PK AUTOINCREMENT<br>
+            <span style="color:#e2e8f0;">timestamp</span> DATETIME NOT NULL<br>
+            <span style="color:#10b981;">sensor_id</span> INTEGER FK→sensor<br>
+            <span style="color:#e2e8f0;">predicted_value</span> REAL NOT NULL<br>
+            <span style="color:#e2e8f0;">model_name</span> VARCHAR(50)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setQuery(q) {
+  document.getElementById('sqlInput').value = q;
+  document.getElementById('sqlInput').focus();
+}
+
+// Ctrl+Enter для выполнения запроса
+document.getElementById('sqlInput').addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    document.getElementById('sqlForm').submit();
+  }
+});
+</script>
+{% endblock %}

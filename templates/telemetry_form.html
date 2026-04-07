@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  {{ 'Редактировать запись' if action == 'edit' else 'Добавить запись' }}
+{% endblock %}
+
+{% block page_title %}
+  {{ 'Редактировать запись телеметрии' if action == 'edit' else 'Добавить запись телеметрии' }}
+{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{{ url_for('db_manager') }}" class="text-decoration-none text-muted">
+      Менеджер БД
+    </a>
+  </li>
+  <li class="breadcrumb-item active">
+    {{ 'Редактировать' if action == 'edit' else 'Добавить запись' }}
+  </li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6">
+
+    <!-- Schema hint -->
+    <div class="card mb-3" style="background:#1e293b; color:#e2e8f0;">
+      <div class="card-body py-2 px-3">
+        <small style="font-family:monospace; font-size:12px;">
+          <span style="color:#94a3b8;">TABLE</span>
+          <span style="color:#60a5fa;"> telemetry</span>
+          <span style="color:#94a3b8;"> (</span>
+          id <span style="color:#f59e0b;">INTEGER PK AUTOINCREMENT</span>,
+          timestamp <span style="color:#f59e0b;">DATETIME NOT NULL</span>,
+          sensor_id <span style="color:#f59e0b;">INTEGER FK→sensor</span>,
+          value <span style="color:#f59e0b;">REAL NOT NULL</span>
+          <span style="color:#94a3b8;">)</span>
+        </small>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-table me-2 text-success"></i>
+        {% if action == 'edit' %}
+          Редактирование записи #{{ record.id }}
+        {% else %}
+          Новая запись телеметрии
+        {% endif %}
+      </div>
+      <div class="card-body p-4">
+        <form method="POST">
+
+          {% if action == 'edit' %}
+          <div class="mb-3">
+            <label class="form-label"><code>id</code></label>
+            <input type="text" class="form-control" value="{{ record.id }}" disabled/>
+            <div class="form-text">PRIMARY KEY AUTOINCREMENT — изменить нельзя</div>
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label">
+              <code>timestamp</code>
+              <span class="badge text-bg-danger ms-1" style="font-size:10px;">NOT NULL</span>
+            </label>
+            <input type="datetime-local" name="timestamp"
+                   class="form-control" value="{{ now }}" required/>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">
+              <code>sensor_id</code>
+              <span class="badge text-bg-info ms-1" style="font-size:10px;">FOREIGN KEY</span>
+            </label>
+            <select name="sensor_id" class="form-select" required>
+              {% for s in sensors %}
+                <option value="{{ s.sensor_id }}"
+                  {% if record and record.sensor_id == s.sensor_id %}selected{% endif %}>
+                  {{ s.sensor_id }} — {{ s.name }}
+                  {% if s.unit %}({{ s.unit }}){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              Ссылается на таблицу <code>sensor(sensor_id)</code>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">
+              <code>value</code>
+              <span class="badge text-bg-danger ms-1" style="font-size:10px;">NOT NULL</span>
+            </label>
+            <input type="number" name="value" step="0.0001"
+                   class="form-control"
+                   value="{{ record.value if record else '' }}"
+                   placeholder="например: 25.4" required/>
+            <div class="form-text">Тип данных: REAL (число с плавающей точкой)</div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success flex-fill">
+              <i class="bi bi-check-circle me-2"></i>
+              {{ 'Сохранить изменения' if action == 'edit' else 'Добавить запись' }}
+            </button>
+            <a href="{{ url_for('db_manager') }}"
+               class="btn btn-outline-secondary">
+              <i class="bi bi-x"></i> Отмена
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -385,6 +385,18 @@
     <a href="{{ url_for('export_data') }}" class="nav-link">
       <i class="bi bi-download"></i> Скачать CSV
     </a>
+
+    <div class="nav-section-label mt-2">База данных</div>
+
+    <a href="{{ url_for('db_manager') }}"
+        class="nav-link {% if request.endpoint in ['db_manager','sensor_add','sensor_edit','telemetry_add','telemetry_edit'] %}active{% endif %}">
+        <i class="bi bi-database-gear"></i> Менеджер БД
+    </a>
+
+    <a href="{{ url_for('sql_console') }}"
+        class="nav-link {% if request.endpoint == 'sql_console' %}active{% endif %}">
+        <i class="bi bi-terminal"></i> SQL-консоль
+    </a>
   </nav>
 
   <div class="sidebar-footer">

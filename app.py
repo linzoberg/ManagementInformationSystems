@@ -365,6 +365,230 @@ def export_prediction():
     return Response(generate(), mimetype='text/csv',
                     headers={'Content-Disposition': f'attachment; filename=prediction_sensor{sensor_id}.csv'})
 
+# ══════════════════════════════════════════════
+#  МЕНЕДЖЕР БАЗЫ ДАННЫХ
+# ══════════════════════════════════════════════
+
+# ── Главная страница менеджера ──
+@app.route('/db')
+def db_manager():
+    # Датчики
+    sensors = Sensor.query.order_by(Sensor.sensor_id).all()
+
+    # Телеметрия с пагинацией
+    page     = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    search_sid = request.args.get('search_sid', '', type=str)
+
+    query = Telemetry.query
+    if search_sid.strip():
+        try:
+            query = query.filter_by(sensor_id=int(search_sid))
+        except ValueError:
+            pass
+
+    pagination = (query
+                  .order_by(Telemetry.timestamp.desc())
+                  .paginate(page=page, per_page=per_page, error_out=False))
+
+    # Статистика таблиц
+    db_stats = {
+        'sensors_count':   Sensor.query.count(),
+        'telemetry_count': Telemetry.query.count(),
+        'prediction_count': Prediction.query.count(),
+    }
+
+    return render_template('db_manager.html',
+                           sensors=sensors,
+                           pagination=pagination,
+                           db_stats=db_stats,
+                           search_sid=search_sid,
+                           per_page=per_page)
+
+
+# ══ CRUD ДАТЧИКИ ══
+
+@app.route('/db/sensor/add', methods=['GET', 'POST'])
+def sensor_add():
+    if request.method == 'POST':
+        try:
+            sid  = request.form.get('sensor_id', '').strip()
+            name = request.form['name'].strip()
+            unit = request.form.get('unit', '').strip()
+            desc = request.form.get('description', '').strip()
+
+            if not name:
+                flash('❌ Название датчика обязательно.', 'danger')
+                return redirect(url_for('sensor_add'))
+
+            # Авто-ID если не задан
+            if sid:
+                sid = int(sid)
+                if Sensor.query.get(sid):
+                    flash(f'❌ Датчик с ID {sid} уже существует.', 'danger')
+                    return redirect(url_for('sensor_add'))
+            else:
+                max_id = db.session.query(db.func.max(Sensor.sensor_id)).scalar() or 0
+                sid = max_id + 1
+
+            db.session.add(Sensor(sensor_id=sid, name=name, unit=unit, description=desc))
+            db.session.commit()
+            flash(f'✅ Датчик #{sid} «{name}» успешно добавлен.', 'success')
+            return redirect(url_for('db_manager'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'❌ Ошибка: {e}', 'danger')
+
+    # Предложить следующий свободный ID
+    max_id = db.session.query(db.func.max(Sensor.sensor_id)).scalar() or 0
+    next_id = max_id + 1
+    return render_template('sensor_form.html', sensor=None, next_id=next_id, action='add')
+
+
+@app.route('/db/sensor/edit/<int:sid>', methods=['GET', 'POST'])
+def sensor_edit(sid):
+    sensor = Sensor.query.get_or_404(sid)
+    if request.method == 'POST':
+        try:
+            sensor.name        = request.form['name'].strip()
+            sensor.unit        = request.form.get('unit', '').strip()
+            sensor.description = request.form.get('description', '').strip()
+            db.session.commit()
+            flash(f'✅ Датчик #{sid} «{sensor.name}» обновлён.', 'success')
+            return redirect(url_for('db_manager'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'❌ Ошибка: {e}', 'danger')
+    return render_template('sensor_form.html', sensor=sensor, next_id=sid, action='edit')
+
+
+@app.route('/db/sensor/delete/<int:sid>', methods=['POST'])
+def sensor_delete(sid):
+    sensor = Sensor.query.get_or_404(sid)
+    name   = sensor.name
+    count  = Telemetry.query.filter_by(sensor_id=sid).count()
+    try:
+        db.session.delete(sensor)   # cascade удалит телеметрию
+        db.session.commit()
+        flash(f'🗑️ Датчик «{name}» и {count} связанных записей удалены.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Ошибка: {e}', 'danger')
+    return redirect(url_for('db_manager'))
+
+
+# ══ CRUD ТЕЛЕМЕТРИЯ ══
+
+@app.route('/db/telemetry/add', methods=['GET', 'POST'])
+def telemetry_add():
+    sensors = Sensor.query.order_by(Sensor.sensor_id).all()
+    if request.method == 'POST':
+        try:
+            ts  = datetime.strptime(request.form['timestamp'], '%Y-%m-%dT%H:%M')
+            sid = int(request.form['sensor_id'])
+            val = float(request.form['value'])
+            if not Sensor.query.get(sid):
+                flash(f'❌ Датчик с ID {sid} не существует.', 'danger')
+                return redirect(url_for('telemetry_add'))
+            db.session.add(Telemetry(timestamp=ts, sensor_id=sid, value=val))
+            db.session.commit()
+            flash(f'✅ Запись добавлена: датчик {sid}, значение {val}.', 'success')
+            return redirect(url_for('db_manager'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'❌ Ошибка: {e}', 'danger')
+    return render_template('telemetry_form.html',
+                           record=None,
+                           sensors=sensors,
+                           now=datetime.now().strftime('%Y-%m-%dT%H:%M'),
+                           action='add')
+
+
+@app.route('/db/telemetry/edit/<int:rid>', methods=['GET', 'POST'])
+def telemetry_edit(rid):
+    record  = Telemetry.query.get_or_404(rid)
+    sensors = Sensor.query.order_by(Sensor.sensor_id).all()
+    if request.method == 'POST':
+        try:
+            record.timestamp = datetime.strptime(request.form['timestamp'], '%Y-%m-%dT%H:%M')
+            record.sensor_id = int(request.form['sensor_id'])
+            record.value     = float(request.form['value'])
+            db.session.commit()
+            flash(f'✅ Запись #{rid} обновлена.', 'success')
+            return redirect(url_for('db_manager'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'❌ Ошибка: {e}', 'danger')
+    return render_template('telemetry_form.html',
+                           record=record,
+                           sensors=sensors,
+                           now=record.timestamp.strftime('%Y-%m-%dT%H:%M'),
+                           action='edit')
+
+
+@app.route('/db/telemetry/delete/<int:rid>', methods=['POST'])
+def telemetry_delete(rid):
+    record = Telemetry.query.get_or_404(rid)
+    try:
+        db.session.delete(record)
+        db.session.commit()
+        flash(f'🗑️ Запись #{rid} удалена.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Ошибка: {e}', 'danger')
+    return redirect(request.referrer or url_for('db_manager'))
+
+
+# ══ SQL КОНСОЛЬ ══
+
+ALLOWED_STATEMENTS = ('select', 'pragma')
+
+@app.route('/db/sql', methods=['GET', 'POST'])
+def sql_console():
+    result_cols = []
+    result_rows = []
+    query_text  = ''
+    error       = None
+    exec_time   = None
+
+    if request.method == 'POST':
+        query_text = request.form.get('sql', '').strip()
+        stmt = query_text.lower().lstrip()
+
+        # Разрешаем только SELECT и PRAGMA
+        if not any(stmt.startswith(kw) for kw in ALLOWED_STATEMENTS):
+            error = '⛔ Разрешены только SELECT и PRAGMA запросы (защита данных).'
+        else:
+            try:
+                import time
+                t0 = time.time()
+                res = db.session.execute(db.text(query_text))
+                exec_time = round((time.time() - t0) * 1000, 2)
+                result_cols = list(res.keys())
+                result_rows = [list(row) for row in res.fetchall()]
+            except Exception as e:
+                error = f'❌ Ошибка SQL: {e}'
+
+    # Подсказки
+    hints = [
+        'SELECT * FROM telemetry LIMIT 20;',
+        'SELECT * FROM sensor;',
+        'SELECT sensor_id, COUNT(*) as cnt FROM telemetry GROUP BY sensor_id;',
+        'SELECT sensor_id, AVG(value) as avg_val, MIN(value) as min_val, MAX(value) as max_val FROM telemetry GROUP BY sensor_id;',
+        'SELECT t.*, s.name, s.unit FROM telemetry t JOIN sensor s ON t.sensor_id = s.sensor_id LIMIT 10;',
+        'SELECT * FROM telemetry ORDER BY value DESC LIMIT 10;',
+        'PRAGMA table_info(telemetry);',
+        'PRAGMA table_info(sensor);',
+    ]
+
+    return render_template('sql_console.html',
+                           query_text=query_text,
+                           result_cols=result_cols,
+                           result_rows=result_rows,
+                           error=error,
+                           exec_time=exec_time,
+                           hints=hints,
+                           row_count=len(result_rows))
 
 if __name__ == '__main__':
     app.run(debug=True)

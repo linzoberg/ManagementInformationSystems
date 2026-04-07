@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  {{ 'Редактировать датчик' if action == 'edit' else 'Добавить датчик' }}
+{% endblock %}
+
+{% block page_title %}
+  {{ 'Редактировать датчик' if action == 'edit' else 'Добавить датчик' }}
+{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item">
+    <a href="{{ url_for('db_manager') }}" class="text-decoration-none text-muted">
+      Менеджер БД
+    </a>
+  </li>
+  <li class="breadcrumb-item active">
+    {{ 'Редактировать' if action == 'edit' else 'Добавить датчик' }}
+  </li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6">
+
+    <!-- Schema hint -->
+    <div class="card mb-3" style="background:#1e293b; color:#e2e8f0;">
+      <div class="card-body py-2 px-3">
+        <small style="font-family:monospace; font-size:12px;">
+          <span style="color:#94a3b8;">TABLE</span>
+          <span style="color:#60a5fa;"> sensor</span>
+          <span style="color:#94a3b8;"> (</span>
+          sensor_id <span style="color:#f59e0b;">INTEGER PK</span>,
+          name <span style="color:#f59e0b;">VARCHAR</span>,
+          unit <span style="color:#f59e0b;">VARCHAR</span>,
+          description <span style="color:#f59e0b;">TEXT</span>
+          <span style="color:#94a3b8;">)</span>
+        </small>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-cpu me-2 text-primary"></i>
+        {% if action == 'edit' %}
+          Редактирование датчика #{{ sensor.sensor_id }}
+        {% else %}
+          Новый датчик
+        {% endif %}
+      </div>
+      <div class="card-body p-4">
+        <form method="POST">
+
+          <!-- ID (только при добавлении) -->
+          {% if action == 'add' %}
+          <div class="mb-3">
+            <label class="form-label">
+              <code>sensor_id</code>
+              <span class="badge text-bg-warning ms-1" style="font-size:10px;">PRIMARY KEY</span>
+            </label>
+            <input type="number" name="sensor_id" class="form-control"
+                   placeholder="Авто ({{ next_id }})" min="1"/>
+            <div class="form-text">
+              Оставьте пустым — система назначит ID автоматически (следующий: {{ next_id }})
+            </div>
+          </div>
+          {% else %}
+          <div class="mb-3">
+            <label class="form-label"><code>sensor_id</code></label>
+            <input type="text" class="form-control" value="{{ sensor.sensor_id }}" disabled/>
+            <div class="form-text">PRIMARY KEY — изменить нельзя</div>
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label">
+              <code>name</code>
+              <span class="badge text-bg-danger ms-1" style="font-size:10px;">NOT NULL</span>
+            </label>
+            <input type="text" name="name" class="form-control"
+                   value="{{ sensor.name if sensor else '' }}"
+                   placeholder="например: Температура" required/>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label"><code>unit</code></label>
+            <input type="text" name="unit" class="form-control"
+                   value="{{ sensor.unit if sensor else '' }}"
+                   placeholder="например: °C, атм, мм/с"/>
+            <div class="form-text">Единица измерения</div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label"><code>description</code></label>
+            <textarea name="description" class="form-control" rows="3"
+                      placeholder="Описание датчика...">{{ sensor.description if sensor else '' }}</textarea>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-fill">
+              <i class="bi bi-check-circle me-2"></i>
+              {{ 'Сохранить изменения' if action == 'edit' else 'Добавить датчик' }}
+            </button>
+            <a href="{{ url_for('db_manager') }}"
+               class="btn btn-outline-secondary">
+              <i class="bi bi-x"></i> Отмена
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% if action == 'edit' and sensor %}
+    <!-- Связанные данные -->
+    <div class="card mt-3">
+      <div class="card-body" style="font-size:12.5px; color:#64748b;">
+        <i class="bi bi-link-45deg me-1 text-primary"></i>
+        <strong>Связанных записей телеметрии:</strong>
+        <span class="badge text-bg-secondary ms-1">{{ sensor.telemetry | length }}</span>
+        <span class="ms-2">
+          — удаление датчика удалит все связанные записи (CASCADE)
+        </span>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
