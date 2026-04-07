@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Ручной ввод{% endblock %}
+{% block page_title %}Ручной ввод данных{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item active">Ручной ввод</li>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-pencil-square me-2 text-info"></i>
+        Добавить запись телеметрии
+      </div>
+      <div class="card-body p-4">
+        <form method="POST">
+          <div class="mb-3">
+            <label class="form-label">
+              <i class="bi bi-calendar-event me-1 text-muted"></i>
+              Дата и время
+            </label>
+            <input type="datetime-local" name="timestamp"
+                   class="form-control" value="{{ now }}" required/>
+            <div class="form-text">Формат: ГГГГ-ММ-ДД ЧЧ:ММ</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">
+              <i class="bi bi-cpu me-1 text-muted"></i>
+              Датчик
+            </label>
+            <select name="sensor_id" class="form-select" required>
+              {% for s in sensors %}
+                <option value="{{ s.sensor_id }}">
+                  {{ s.sensor_id }} — {{ s.name }}
+                  {% if s.unit %}({{ s.unit }}){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">
+              <i class="bi bi-123 me-1 text-muted"></i>
+              Значение
+            </label>
+            <input type="number" name="value" step="0.0001"
+                   class="form-control" placeholder="например: 25.4" required/>
+          </div>
+
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-plus-circle me-2"></i>Добавить запись
+            </button>
+            <a href="{{ url_for('data_view') }}" class="btn btn-outline-secondary">
+              <i class="bi bi-table me-2"></i>Просмотр данных
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Hint -->
+    <div class="card mt-3">
+      <div class="card-body" style="font-size:12.5px; color:#64748b;">
+        <i class="bi bi-lightbulb text-warning me-2"></i>
+        <strong>Подсказка:</strong> для массовой загрузки данных используйте
+        <a href="{{ url_for('upload') }}" class="text-decoration-none">загрузку CSV-файла</a>.
+        Ручной ввод предназначен для добавления единичных записей.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

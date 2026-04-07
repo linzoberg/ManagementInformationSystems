@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block title %}Прогнозирование{% endblock %}
+{% block page_title %}Предиктивная аналитика{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item active">Прогнозирование</li>
+{% endblock %}
+
+{% block content %}
+
+<div class="row g-4">
+
+  <!-- ── FORM ── -->
+  <div class="col-md-4 col-lg-3">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-sliders me-2 text-primary"></i>Параметры прогноза
+      </div>
+      <div class="card-body">
+        <form method="POST">
+          <div class="mb-3">
+            <label class="form-label">
+              <i class="bi bi-cpu me-1 text-muted"></i>Датчик
+            </label>
+            <select name="sensor_id" class="form-select" required>
+              {% for s in sensors %}
+                <option value="{{ s.sensor_id }}"
+                  {% if selected_sensor_id == s.sensor_id %}selected{% endif %}>
+                  {{ s.sensor_id }} — {{ s.name }}
+                  {% if s.unit %}({{ s.unit }}){% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">
+              <i class="bi bi-arrow-right-circle me-1 text-muted"></i>
+              Шагов прогноза
+            </label>
+            <input type="number" name="steps" min="1" max="200"
+                   class="form-control" value="{{ steps }}" required/>
+            <div class="form-text">От 1 до 200 шагов вперёд</div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 mb-2">
+            <i class="bi bi-graph-up-arrow me-2"></i>Построить прогноз
+          </button>
+
+          {% if pred_table %}
+          <a href="{{ url_for('export_prediction', sensor_id=selected_sensor_id, steps=steps) }}"
+             class="btn btn-success w-100">
+            <i class="bi bi-download me-2"></i>Скачать прогноз CSV
+          </a>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+
+    <!-- Model info -->
+    <div class="card mt-3">
+      <div class="card-header" style="font-size:12px;">
+        <i class="bi bi-info-circle me-1"></i>Модель
+      </div>
+      <div class="card-body" style="font-size:12px; color:#64748b; line-height:1.7;">
+        <div><strong>Алгоритм:</strong> Линейная регрессия</div>
+        <div><strong>Библиотека:</strong> scikit-learn</div>
+        <div><strong>Признак:</strong> timestamp → секунды</div>
+        {% if r2_score is not none %}
+        <div class="mt-2 pt-2 border-top">
+          <strong>R² score:</strong>
+          <span class="fw-bold" style="color:
+            {% if r2_score >= 0.8 %}#10b981
+            {% elif r2_score >= 0.5 %}#f59e0b
+            {% else %}#ef4444{% endif %};">
+            {{ r2_score }}
+          </span>
+          <div class="form-text mt-1">
+            {% if r2_score >= 0.8 %}Высокое качество модели
+            {% elif r2_score >= 0.5 %}Среднее качество модели
+            {% else %}Низкое качество (данные нелинейны){% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RESULTS ── -->
+  <div class="col-md-8 col-lg-9">
+    {% if plot_b64 %}
+
+    <!-- Graph -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <i class="bi bi-graph-up me-2 text-primary"></i>
+        График прогноза
+        <span class="badge text-bg-warning ms-2">
+          <i class="bi bi-dash-lg me-1"></i>Прогноз (красный)
+        </span>
+        <span class="badge text-bg-primary ms-1">
+          <i class="bi bi-graph-up me-1"></i>Факт (синий)
+        </span>
+      </div>
+      <div class="card-body graph-container p-3">
+        <img src="data:image/png;base64,{{ plot_b64 }}" alt="График прогноза"/>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span>
+          <i class="bi bi-table me-2"></i>Прогнозные значения
+          <span class="badge text-bg-warning ms-1">{{ pred_table | length }} шагов</span>
+        </span>
+        <a href="{{ url_for('export_prediction', sensor_id=selected_sensor_id, steps=steps) }}"
+           class="btn btn-success btn-sm">
+          <i class="bi bi-download me-1"></i>CSV
+        </a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height:380px; overflow-y:auto;">
+          <table class="table table-hover mb-0">
+            <thead style="position:sticky; top:0; z-index:1;">
+              <tr>
+                <th class="ps-4">#</th>
+                <th>Временная метка</th>
+                <th>Прогноз. значение</th>
+                <th>Тип</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in pred_table %}
+              <tr>
+                <td class="ps-4 text-muted" style="font-size:12px;">{{ loop.index }}</td>
+                <td style="font-size:13px; white-space:nowrap;">
+                  {{ row.timestamp[:10] }}
+                  <span class="text-muted">{{ row.timestamp[11:] }}</span>
+                </td>
+                <td>
+                  <span class="pred-badge">{{ row.value }}</span>
+                </td>
+                <td style="font-size:12px; color:#94a3b8;">LinearRegression</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    {% else %}
+
+    <!-- Empty state -->
+    <div class="card">
+      <div class="card-body text-center py-5" style="color:#94a3b8;">
+        <i class="bi bi-graph-up-arrow" style="font-size:64px; opacity:.4;"></i>
+        <h5 class="mt-3 mb-2" style="color:#64748b;">Прогноз не построен</h5>
+        <p style="font-size:13.5px; max-width:400px; margin:0 auto 20px;">
+          Выберите датчик и количество шагов прогноза, затем нажмите
+          <strong>«Построить прогноз»</strong>.
+          Для работы необходимо минимум 3 записи.
+        </p>
+        <div class="d-flex gap-2 justify-content-center">
+          <a href="{{ url_for('data_view') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-table me-1"></i>Просмотр данных
+          </a>
+          <form method="POST" action="{{ url_for('upload') }}">
+            <button name="generate_demo" type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-magic me-1"></i>Сгенерировать демо
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+
+{% block title %}Просмотр данных{% endblock %}
+{% block page_title %}Данные телеметрии{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item active">Просмотр данных</li>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── TOOLBAR ── -->
+<div class="card mb-4">
+  <div class="card-body py-3">
+    <div class="row align-items-center g-2">
+
+      <!-- Filter -->
+      <div class="col-auto">
+        <form method="GET" class="d-flex align-items-center gap-2">
+          <label class="form-label mb-0 fw-semibold" style="white-space:nowrap; font-size:13px;">
+            <i class="bi bi-funnel me-1"></i>Датчик:
+          </label>
+          <select name="sensor_id" class="form-select form-select-sm" style="width:auto;">
+            <option value="">Все датчики</option>
+            {% for s in sensors %}
+              <option value="{{ s.sensor_id }}"
+                {% if selected_sensor == s.sensor_id %}selected{% endif %}>
+                {{ s.sensor_id }} — {{ s.name }}
+              </option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-primary btn-sm px-3">
+            <i class="bi bi-filter me-1"></i>Применить
+          </button>
+          {% if selected_sensor %}
+            <a href="{{ url_for('data_view') }}" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-x"></i>
+            </a>
+          {% endif %}
+        </form>
+      </div>
+
+      <div class="col-auto ms-auto d-flex gap-2">
+        <!-- Export -->
+        <a href="{{ url_for('export_data') }}" class="btn btn-success btn-sm">
+          <i class="bi bi-download me-1"></i>Экспорт CSV
+        </a>
+        <!-- Delete -->
+        {% if total > 0 %}
+        <form method="POST" action="{{ url_for('delete_all') }}" id="deleteForm">
+          <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete()">
+            <i class="bi bi-trash3 me-1"></i>Очистить БД
+          </button>
+        </form>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── STATS ROW ── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center py-3">
+      <div style="font-size:22px; font-weight:700; color:#3b82f6;">{{ total }}</div>
+      <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Всего записей</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center py-3">
+      <div style="font-size:22px; font-weight:700; color:#10b981;">
+        {{ sensors | length }}
+      </div>
+      <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Датчиков</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center py-3">
+      <div style="font-size:22px; font-weight:700; color:#f59e0b;">
+        {{ records | length }}
+      </div>
+      <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Показано записей</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center py-3">
+      <div style="font-size:22px; font-weight:700; color:#8b5cf6;">3НФ</div>
+      <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Нормализация БД</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── GRAPH ── -->
+{% if plot_b64 %}
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-graph-up me-2 text-primary"></i>
+    График временного ряда
+    {% if selected_sensor %}
+      <span class="badge text-bg-primary ms-2">
+        {% for s in sensors %}{% if s.sensor_id == selected_sensor %}{{ s.name }}{% endif %}{% endfor %}
+      </span>
+    {% else %}
+      <span class="badge text-bg-secondary ms-2">Все датчики</span>
+    {% endif %}
+  </div>
+  <div class="card-body graph-container p-3">
+    <img src="data:image/png;base64,{{ plot_b64 }}" alt="График телеметрии"/>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── TABLE ── -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span>
+      <i class="bi bi-table me-2"></i>
+      Последние записи
+      <span class="badge text-bg-secondary ms-1">{{ records | length }}</span>
+    </span>
+    <span style="font-size:11px; color:#94a3b8;">Показаны последние 100</span>
+  </div>
+  <div class="card-body p-0">
+    {% if records %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th class="ps-4">#</th>
+            <th>Время</th>
+            <th>Датчик</th>
+            <th>Тип</th>
+            <th>Значение</th>
+            <th>Ед. изм.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set colors = ['#3b82f6','#f59e0b','#10b981','#8b5cf6','#ef4444'] %}
+          {% for r in records %}
+          <tr>
+            <td class="ps-4 text-muted" style="font-size:12px;">{{ r.id }}</td>
+            <td style="font-size:13px; white-space:nowrap;">
+              {{ r.timestamp.strftime('%Y-%m-%d') }}
+              <span class="text-muted">{{ r.timestamp.strftime('%H:%M:%S') }}</span>
+            </td>
+            <td>
+              <span class="sensor-indicator me-1"
+                    style="background:{{ colors[(r.sensor_id-1) % colors|length] }};
+                           display:inline-block; width:8px; height:8px; border-radius:50%;"></span>
+              <strong>{{ r.sensor_id }}</strong>
+            </td>
+            <td style="font-size:12px; color:#64748b;">
+              {% for s in sensors %}
+                {% if s.sensor_id == r.sensor_id %}{{ s.name }}{% endif %}
+              {% endfor %}
+            </td>
+            <td>
+              <span class="fw-semibold" style="color:{{ colors[(r.sensor_id-1) % colors|length] }};">
+                {{ '%.4f' | format(r.value) }}
+              </span>
+            </td>
+            <td style="font-size:12px; color:#94a3b8;">
+              {% for s in sensors %}
+                {% if s.sensor_id == r.sensor_id %}{{ s.unit }}{% endif %}
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5" style="color:#94a3b8;">
+      <i class="bi bi-inbox" style="font-size:48px;"></i>
+      <p class="mt-3 mb-3">Данных пока нет</p>
+      <div class="d-flex gap-2 justify-content-center">
+        <a href="{{ url_for('upload') }}" class="btn btn-primary btn-sm">
+          <i class="bi bi-upload me-1"></i>Загрузить CSV
+        </a>
+        <form method="POST" action="{{ url_for('upload') }}">
+          <button name="generate_demo" type="submit" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-magic me-1"></i>Демо-данные
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmDelete() {
+  if (confirm('⚠️ Вы уверены, что хотите удалить ВСЕ данные телеметрии?\nЭто действие необратимо!')) {
+    document.getElementById('deleteForm').submit();
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+
+{% block title %}Загрузка данных{% endblock %}
+{% block page_title %}Загрузка данных{% endblock %}
+{% block breadcrumb %}
+  <li class="breadcrumb-item active">Загрузка данных</li>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- ── CSV Upload ── -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-file-earmark-csv me-2 text-success"></i>
+        Загрузка CSV-файла
+      </div>
+      <div class="card-body">
+        <form method="POST" enctype="multipart/form-data" id="csvForm">
+          <div class="upload-zone mb-3" onclick="document.getElementById('csvInput').click();">
+            <i class="bi bi-cloud-upload"></i>
+            <p class="mt-3 mb-1 fw-semibold" style="color:#475569;">
+              Перетащите файл или нажмите для выбора
+            </p>
+            <p style="font-size:12px; color:#94a3b8;">Поддерживается формат CSV</p>
+            <input type="file" name="csv_file" id="csvInput" accept=".csv"
+                   class="d-none" onchange="showFileName(this)"/>
+            <div id="fileName" class="mt-2" style="font-size:13px; color:#3b82f6; font-weight:500;"></div>
+          </div>
+
+          <div class="alert alert-info" style="font-size:12.5px;">
+            <i class="bi bi-info-circle me-1"></i>
+            <strong>Формат файла:</strong> первая строка — заголовки
+            <code>timestamp, sensor_id, value</code><br>
+            Пример: <code>2026-03-24 10:00:00, 1, 25.4</code>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-upload me-2"></i>Загрузить CSV
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Demo Data ── -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-magic me-2 text-primary"></i>
+        Генерация демо-данных
+      </div>
+      <div class="card-body">
+        <div class="text-center py-2 mb-3">
+          <i class="bi bi-database-gear" style="font-size:56px; color:#3b82f6; opacity:.8;"></i>
+        </div>
+        <p style="font-size:13.5px; color:#475569; line-height:1.7;">
+          Система сгенерирует <strong>600 записей</strong> для трёх датчиков
+          (по 200 точек каждый) с реалистичными трендами, сезонностью и шумом:
+        </p>
+        <div class="row g-2 mb-3">
+          <div class="col-4 text-center">
+            <div class="p-2 rounded" style="background:#eff6ff; border:1px solid #bfdbfe;">
+              <i class="bi bi-thermometer-half text-primary"></i>
+              <div style="font-size:11px; color:#3b82f6; margin-top:4px; font-weight:600;">Температура</div>
+              <div style="font-size:10px; color:#94a3b8;">25–40 °C</div>
+            </div>
+          </div>
+          <div class="col-4 text-center">
+            <div class="p-2 rounded" style="background:#fffbeb; border:1px solid #fde68a;">
+              <i class="bi bi-activity text-warning"></i>
+              <div style="font-size:11px; color:#d97706; margin-top:4px; font-weight:600;">Вибрация</div>
+              <div style="font-size:10px; color:#94a3b8;">3–6 мм/с</div>
+            </div>
+          </div>
+          <div class="col-4 text-center">
+            <div class="p-2 rounded" style="background:#ecfdf5; border:1px solid #a7f3d0;">
+              <i class="bi bi-speedometer text-success"></i>
+              <div style="font-size:11px; color:#10b981; margin-top:4px; font-weight:600;">Давление</div>
+              <div style="font-size:10px; color:#94a3b8;">5–7 атм</div>
+            </div>
+          </div>
+        </div>
+
+        <form method="POST">
+          <button name="generate_demo" type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-lightning-charge me-2"></i>Сгенерировать демо-данные
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CSV Template ── -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-file-text me-2"></i>Пример CSV-файла
+      </div>
+      <div class="card-body">
+        <pre style="background:#1e293b; color:#e2e8f0; border-radius:10px;
+                    padding:16px; font-size:13px; margin:0; overflow-x:auto;">timestamp,sensor_id,value
+2026-03-24 08:00:00,1,24.5
+2026-03-24 08:05:00,1,25.1
+2026-03-24 08:10:00,1,26.3
+2026-03-24 08:00:00,2,3.8
+2026-03-24 08:05:00,2,4.1
+2026-03-24 08:00:00,3,5.2</pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showFileName(input) {
+  const el = document.getElementById('fileName');
+  el.textContent = input.files[0] ? '📄 ' + input.files[0].name : '';
+}
+</script>
+{% endblock %}
